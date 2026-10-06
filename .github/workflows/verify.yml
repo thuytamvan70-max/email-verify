@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        shard: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20] # 20台机器并发
+        shard: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
     steps:
       - name: 拉取代码
         uses: actions/checkout@v4
@@ -19,7 +19,7 @@ jobs:
       - name: 安装依赖
         run: pip install dnspython
       - name: 运行验证脚本
-        run: python verify.py ${{ matrix.shard }} 20 # 传入分片号和总数
+        run: python verify.py ${{ matrix.shard }} 20
       - name: 上传结果
         uses: actions/upload-artifact@v4
         with:
