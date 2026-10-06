@@ -38,7 +38,7 @@ def verify_email(email):
             return f"{email} -> 无法验证 (错误: {str(e)[:50]})"
 
 def task(email):
-    # 每个线程开始前，随机休息 0.1 到 0.5 秒，避免并发冲击
+    # 每个线程开始前，随机休息 0.1 到 0.5 秒
     time.sleep(random.uniform(0.1, 0.5))
     res = verify_email(email)
     with lock:
@@ -48,9 +48,9 @@ def task(email):
 with open('emails.txt', 'r') as f:
     emails = [line.strip() for line in f if line.strip()]
 
-print(f"开始验证 {len(emails)} 个邮箱，控制并发数为 3...")
-# 极其重要的改动：把 20 降成 3
-with ThreadPoolExecutor(max_workers=3) as executor:
+print(f"开始验证 {len(emails)} 个邮箱，控制并发数为 20...")
+# 改回了 20 并发
+with ThreadPoolExecutor(max_workers=20) as executor:
     executor.map(task, emails)
 
 with open('result.txt', 'w') as f:
