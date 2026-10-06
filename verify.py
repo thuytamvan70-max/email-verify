@@ -14,19 +14,21 @@ SMTP_MAP = {
     "msn.com":     "msn-com.olc.protection.outlook.com",
 }
 SMTP_PORT = 25
-USE_LIMIT = 5
+USE_LIMIT = 5           # 每个IP最多用5次（对微软IP而言，5次后必须休息）
 PROBE_TIMEOUT = 10
 
 def random_ehlo():
-    rand_part= "".join(random.choices(string.ascii_lowercase, k=6))
+    rand_part = "".join(random.choices(string.ascii_lowercase, k=6))
     return f"{rand_part}.com"
 
-# === 修复：永远返回本地 IP，不会因为一次 unknown 就退出 ===
+# 完全去代理，只使用本机IP（但保留IP管理器结构）
 class LocalIPManager:
     def __init__(self):
-        pass
+        self.ready_q = queue.Queue()
+        self.ready_q.put(("local_ip", 0))
     def acquire(self, timeout=30):
-        return ("local_ip", 0) # 永远返回本地IP
+        try: return self.ready_q.get(timeout=timeout)
+        except queue.Empty: return None
 
 def db_init(path):
     conn = sqlite3.connect(str(path), check_same_thread=False)
@@ -70,7 +72,7 @@ def verify_email(email, proxy, timeout):
 
         if rcpt.startswith("250"): return "exist"
         if rcpt.startswith(("550","551","553")): return "fail"
-        return "unknown"
+        return "unknown"  # 450/451/452 等限流状态全部归为 unknown
     except Exception:
         return "unknown"
     finally:
@@ -106,7 +108,7 @@ def main():
         print("全部已验证完毕！")
         return
 
-    n_threads = 20
+    n_threads = 15  # 降低单节点并发，避免触发流控
     timeout_s = 10
     stop_ev = threading.Event()
     mgr = LocalIPManager()
@@ -126,7 +128,6 @@ def main():
 
     def _worker():
         my_ip = mgr.acquire(timeout=10)
-        use_cnt = 0
         while not stop_ev.is_set():
             try:
                 email = task_q.get(timeout=2)
@@ -139,19 +140,16 @@ def main():
 
             status = verify_email(email, my_ip, timeout_s)
 
-            # 【核心修复】遇到 unknown，停止 0.5 秒，继续用同一个 IP 跑下一个
-            # 绝对不能丢弃 my_ip，否则线程就会因为没有 IP 自杀。
+            # 核心逻辑：遇到 unknown（限流），该线程主动休眠 1.5 秒，给微软服务器时间恢复
             if status == "unknown":
-                time.sleep(random.uniform(0.5, 1.5)) 
+                time.sleep(1.5)
                 with pend_lk:
                     uk_n[0] += 1
                     done_n[0] += 1
                     idx = done_n[0]
-                print(f"[{idx}/{total_todo}] {email} -> unknown (被限流/超时，休息重试)")
+                print(f"[{idx}/{total_todo}] {email} -> unknown (限流，冷却中)")
                 task_q.task_done()
                 continue
-
-            use_cnt += 1
 
             if status == "fail":
                 with pend_lk:
