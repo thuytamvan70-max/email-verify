@@ -26,7 +26,7 @@ def verify_email(email):
         mx_record = get_mx(domain)
         if not mx_record: return f"{email} -> 无效 (无MX记录)"
 
-        server = smtplib.SMTP(timeout=3) # 超过 3 秒没响应直接放弃
+        server = smtplib.SMTP(timeout=3)
         server.connect(mx_record, 25)
         server.helo('example.com')
         server.mail('verify@test.com')
@@ -39,7 +39,7 @@ def verify_email(email):
 def task(email):
     res = verify_email(email)
     with lock:
-        print(res)
+        print(res) # 这一行会在 GitHub 控制台实时打印，前提是你去 GitHub 看日志
         results.append(res)
 
 with open('emails.txt', 'r') as f:
@@ -51,7 +51,6 @@ my_emails = all_emails[shard_id-1::20]
 print(f"节点 {shard_id}/20 开始极速验证 {len(my_emails)} 个邮箱...")
 start_time = time.time()
 
-# 极速并发：200线程
 with ThreadPoolExecutor(max_workers=200) as executor:
     executor.map(task, my_emails)
 
