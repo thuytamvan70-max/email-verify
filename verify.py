@@ -1,20 +1,23 @@
 import smtplib
 import dns.resolver
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
+# 线程锁，防止多个线程同时写入文件发生错乱
+lock = threading.Lock()
+results = []
 
 def verify_email(email):
     try:
         domain = email.split('@')[1]
-        # 1. 查 MX 记录
         records = dns.resolver.resolve(domain, 'MX')
         mx_record = str(records[0].exchange)
 
-        # 2. 连接 SMTP 服务器，设置超时时间
         server = smtplib.SMTP(timeout=10)
         server.connect(mx_record, 25)
         server.helo('example.com')
         server.mail('test@example.com')
         
-        # 3. 发送 RCPT TO 指令验证
         code, message = server.rcpt(email)
         server.quit()
         
@@ -25,13 +28,25 @@ def verify_email(email):
     except Exception as e:
         return f"{email} -> 无法验证 (错误: {str(e)[:50]})"
 
-# 读取 emails.txt
+# 线程执行的任务
+def task(email):
+    res = verify_email(email)
+    with lock:
+        print(res)
+        results.append(res)
+
+# 读取邮箱
 with open('emails.txt', 'r') as f:
     emails = [line.strip() for line in f if line.strip()]
 
-# 写入 result.txt
+# 开启多线程并发：这里设定最多同时跑 20 个任务
+print(f"开始并发验证 {len(emails)} 个邮箱...")
+with ThreadPoolExecutor(max_workers=20) as executor:
+    executor.map(task, emails)
+
+# 写入结果
 with open('result.txt', 'w') as f:
-    for email in emails:
-        res = verify_email(email)
-        print(res)
+    for res in results:
         f.write(res + '\n')
+
+print("验证完成！")
