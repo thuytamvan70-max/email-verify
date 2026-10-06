@@ -6,10 +6,6 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4, 5]   # 从 20 改成 5，免费版最大并发数
     steps:
       - name: 拉取代码
         uses: actions/checkout@v4
@@ -17,12 +13,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - name: 安装依赖
-        run: pip install pysocks
       - name: 极速验证
-        run: python verify.py ${{ matrix.shard }}
+        run: python verify.py 0 5  # 参数0表示不切片，参数5表示把当前输入的完整文件切成5份
       - name: 上传结果
         uses: actions/upload-artifact@v4
         with:
-          name: result-${{ matrix.shard }}
-          path: result_${{ matrix.shard }}.txt
+          name: result-${{ github.run_id }}
+          path: result_*.txt
