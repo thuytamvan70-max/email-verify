@@ -1,7 +1,7 @@
 name: Verify Microsoft Emails
 
 on:
-  workflow_dispatch: # 允许你手动点击按钮触发
+  workflow_dispatch: 
 
 jobs:
   verify:
@@ -15,6 +15,9 @@ jobs:
         with:
           python-version: '3.10'
           
+      - name: 安装依赖
+        run: pip install dnspython
+        
       - name: 运行验证脚本
         run: python verify.py
         
